@@ -291,6 +291,50 @@ class GitProfileSwitch {
             """.trimIndent(),
         )
     }
+
+    /**
+     * Lists all available profiles.
+     */
+    fun listProfiles() {
+        if (!profilesFile.exists()) {
+            println("Profiles file not found at $profilesFilePath")
+            return
+        }
+
+        val profiles = parseProfiles(profilesFile)
+        if (profiles.isEmpty()) {
+            println("No profiles found.")
+            return
+        }
+
+        println("Available profiles:")
+        profiles.forEach { (profileName, profile) ->
+            println("Profile: $profileName, Name: ${profile.name}, Email: ${profile.email}")
+        }
+    }
+
+    /**
+     * Backs up the profiles file.
+     */
+    fun backupProfiles() {
+        val backupFile = File("$profilesFilePath.bak")
+        profilesFile.copyTo(backupFile, overwrite = true)
+        println("Profiles file backed up to ${backupFile.path}")
+    }
+
+    /**
+     * Restores the profiles file from a backup.
+     */
+    fun restoreProfiles() {
+        val backupFile = File("$profilesFilePath.bak")
+        if (!backupFile.exists()) {
+            println("Backup file not found at ${backupFile.path}")
+            return
+        }
+
+        backupFile.copyTo(profilesFile, overwrite = true)
+        println("Profiles file restored from ${backupFile.path}")
+    }
 }
 
 /**
@@ -370,6 +414,9 @@ fun main(args: Array<String>) {
         "update" -> handleUpdateCommand(args, gitProfileSwitch)
         "delete" -> handleDeleteCommand(args, gitProfileSwitch)
         "view" -> gitProfileSwitch.viewConfigFile()
+        "list" -> gitProfileSwitch.listProfiles()
+        "backup" -> gitProfileSwitch.backupProfiles()
+        "restore" -> gitProfileSwitch.restoreProfiles()
         "help" -> gitProfileSwitch.printHelp()
         else -> println("Unknown command: ${args[0]}")
     }
