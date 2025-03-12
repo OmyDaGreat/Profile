@@ -1,0 +1,188 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'README.*'
+      - 'LICENSE'
+      - '.github/**/*.md'
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    env:
+      KT_NAME: Runner
+      APP_NAME: runner
+      REPO_LOCATION: https://github.com/OmyDaGreat/KotlinScriptTemplate
+      BUCKET_LOCATION: OmyDaGreat/MaleficBucket
+      BUCKET_NAME: malefic
+      DESCRIPTION: A Kotlin-based conventional commit message generator
+      JAVA_VERSION: '21'
+      KOTLIN_VERSION: '2.1.10'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Setup Kotlin
+        uses: fwilhe2/setup-kotlin@v1
+        with:
+          version: ${{ env.KOTLIN_VERSION }}
+
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      - name: Determine Version
+        id: version
+        run: |
+          # Get the latest tag or default to 0.1.0 if no tags exist
+          git fetch --tags
+          latest_tag=$(git tag -l "v*" | sort -V | tail -n 1)
+
+          if [ -z "$latest_tag" ]; then
+            latest_version="0.1.0"
+          else
+            latest_version="${latest_tag#v}"
+          fi
+
+          # Split version into major, minor, patch
+          IFS='.' read -r major minor patch <<< "$latest_version"
+
+          # Bump version based on input or default to patch
+          bump_type="${{ github.event.inputs.version_bump || 'patch' }}"
+
+          if [ "$bump_type" == "major" ]; then
+            major=$((major + 1))
+            minor=0
+            patch=0
+          elif [ "$bump_type" == "minor" ]; then
+            minor=$((minor + 1))
+            patch=0
+          else
+            patch=$((patch + 1))
+          fi
+
+          new_version="$major.$minor.$patch"
+          echo "New version: $new_version"
+          echo "version=$new_version" >> $GITHUB_OUTPUT
+          echo "tag=v$new_version" >> $GITHUB_OUTPUT
+
+      - name: Compile Kotlin Application
+        run: |
+          mkdir -p build
+          kotlinc ${{ env.KT_NAME }}.kt -include-runtime -d build/${{ env.APP_NAME }}.jar
+
+      - name: Prepare Files for Packaging
+        run: |
+          mkdir -p package
+          cp build/${{ env.APP_NAME }}.jar package/
+          cp LICENSE package/ || echo "LICENSE file not found"
+          cp README.adoc package/ || echo "README.adoc file not found"
+
+          # Create batch file
+          echo '@echo off' > package/${{ env.APP_NAME }}.bat
+          echo 'java -jar "%~dp0\${{ env.APP_NAME }}.jar" %*' >> package/${{ env.APP_NAME }}.bat
+
+      - name: Verify ${{ env.APP_NAME }}.bat File Exists
+        run: |
+          if [ ! -f package/${{ env.APP_NAME }}.bat ]; then
+            echo "${{ env.APP_NAME }}.bat file not found!"
+            exit 1
+          fi
+
+      - name: Create ZIP Archive
+        run: |
+          cd package
+          zip -r ../${{ env.APP_NAME }}-${{ steps.version.outputs.version }}.zip ./*
+
+      - name: Calculate SHA256
+        id: sha
+        run: |
+          checksum=$(sha256sum ${{ env.APP_NAME }}-${{ steps.version.outputs.version }}.zip | awk '{print $1}')
+          echo "sha256=$checksum" >> $GITHUB_OUTPUT
+
+      - name: Create Scoop Manifest
+        run: |
+          cat > ${{ env.APP_NAME }}.json << EOF
+          {
+              "version": "${{ steps.version.outputs.version }}",
+              "description": "${{ env.DESCRIPTION }}",
+              "homepage": "${{ env.REPO_LOCATION }}",
+              "license": "MIT",
+              "architecture": {
+                  "64bit": {
+                      "url": "${{ env.REPO_LOCATION }}/releases/download/${{ steps.version.outputs.tag }}/${{ env.APP_NAME }}-${{ steps.version.outputs.version }}.zip",
+                      "hash": "${{ steps.sha.outputs.sha256 }}"
+                  }
+              },
+              "bin": "${{ env.APP_NAME }}.bat",
+              "checkver": "github",
+              "autoupdate": {
+                  "architecture": {
+                      "64bit": {
+                          "url": "${{ env.REPO_LOCATION }}/releases/download/v\$version/${{ env.APP_NAME }}-\$version.zip"
+                      }
+                  }
+              }
+          }
+          EOF
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Release ${{ steps.version.outputs.version }}
+          body: |
+            Release ${{ steps.version.outputs.version }} - ${{ steps.date.outputs.date }}
+
+            ### SHA256 Checksum
+            ```
+            ${{ steps.sha.outputs.sha256 }}
+            ```
+
+            ### Installation via Scoop
+            ```
+            scoop bucket add ${{ env.BUCKET_NAME }} https://github.com/${{ env.BUCKET_LOCATION }}
+            scoop install ${{ env.APP_NAME }}
+            ```
+          draft: false
+          prerelease: false
+          files: |
+            ${{ env.APP_NAME }}-${{ steps.version.outputs.version }}.zip
+            ${{ env.APP_NAME }}.json
+
+      - name: Update Scoop Bucket
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.update_bucket != 'false' }}
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
+          repository: ${{ env.BUCKET_LOCATION }}
+          event-type: update-${{ env.APP_NAME }}
+          client-payload: '{"version": "${{ steps.version.outputs.version }}", "sha256": "${{ steps.sha.outputs.sha256 }}", "tag": "${{ steps.version.outputs.tag }}"}'

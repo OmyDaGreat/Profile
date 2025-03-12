@@ -1,0 +1,23 @@
+types:
+  - feat: A new feature
+  - fix: A bug fix
+  - docs: Documentation only changes
+  - chore: Other changes that don't modify src or test files
+
+scopes:
+  - core
+  - docs
+
+options:
+  allowCustomScopes: true
+  allowEmptyScopes: true
+  issuePrefix: "ISSUES CLOSED:"
+  changesPrefix: "BREAKING CHANGE:"
+  remindToStageChanges: true
+  allowBreakingChanges:
+    - feat
+    - fix
+  allowIssues:
+    - feat
+    - fix
+    - docs

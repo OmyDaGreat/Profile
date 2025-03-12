@@ -1,0 +1,129 @@
+= KotlinScriptTemplate
+
+A template for creating Kotlin command-line applications with automated GitHub releases and Scoop package publishing.
+
+== Overview
+
+This template provides a simple structure for Kotlin applications with:
+
+- Single Kotlin source file
+- Batch file for easy execution
+- GitHub Actions workflow for automated releases
+- Scoop manifest generation and publishing
+
+== Prerequisites
+
+- Java 21
+- Kotlin 2.1.10
+- Git
+
+== Getting Started
+
+1. Clone this template repository:
++
+[source]
+----
+git clone https://github.com/YOUR-USERNAME/KotlinScriptTemplate.git
+cd KotlinScriptTemplate
+----
+
+2. Modify the `Runner.kt` file with your application logic.
+
+3. Build the project:
++
+[source]
+----
+kotlinc Runner.kt -include-runtime -d build/runner.jar
+----
+
+4. Run the application:
++
+[source]
+----
+runner.bat hello
+----
+
+== Customizing the Template
+
+1. Rename the main Kotlin file from `Runner.kt` to your application name.
+2. Update the batch file name from `runner.bat` to match your application.
+3. Edit `.kommit.yaml` to customize commit message types and scopes as needed.
+
+== Configuring Automated Releases
+
+Update the environment variables in `.github/workflows/release.yml.tmp` (and remove its `.tmp` extension):
+
+[source,yaml]
+----
+env:
+  KT_NAME: YourAppName          # Main Kotlin file name (without .kt)
+  APP_NAME: yourappname         # Name for compiled app (lowercase)
+  REPO_LOCATION: https://github.com/YOUR-USERNAME/YourRepository
+  BUCKET_LOCATION: YOUR-USERNAME/YourBucket
+  BUCKET_NAME: yourbucket
+  DESCRIPTION: Your application description
+  JAVA_VERSION: '21'           # Required Java version
+  KOTLIN_VERSION: '2.1.10'     # Required Kotlin version
+----
+
+== Setting Up Scoop Publishing
+
+1. Create a Scoop bucket repository if you don't have one.
+
+2. Create a Personal Access Token with `repo` permissions in GitHub:
+- Go to Settings > Developer settings > Personal access tokens
+- Generate a new token with `repo` scope
+- Copy the token
+
+3. Add the token as a repository secret:
+- Go to your repository settings
+- Select "Secrets and variables" > "Actions"
+- Add a new secret named `REPO_ACCESS_TOKEN` with your token
+
+4. Add the workflow file to your Scoop bucket repository:
+- Create a file at `.github/workflows/update-runner.yml` in your bucket repository
+- Copy the content from `update-runner.yml.tmp` in this template
+- Update the environment variables to match your application settings
++
+[source,yaml]
+----
+env:
+  KT_NAME: YourAppName          # Main Kotlin file name (without .kt)
+  APP_NAME: yourappname         # Name for compiled app (lowercase)
+  REPO_LOCATION: https://github.com/YOUR-USERNAME/YourRepository
+  BUCKET_LOCATION: YOUR-USERNAME/YourBucket
+  BUCKET_NAME: yourbucket
+  DESCRIPTION: Your application description
+  JAVA_VERSION: '21'
+  KOTLIN_VERSION: '2.1.10'
+----
+
+5. When a new release is created, the workflow will:
+- Build your application
+- Package it as a ZIP
+- Create a GitHub release
+- Generate a Scoop manifest
+- Send a dispatch event to your Scoop bucket repository
+- The bucket repository will automatically update with the new version information
+
+== Manual Version Bumps
+
+Trigger a manual release with a specific version bump:
+
+1. Go to the Actions tab in your repository
+2. Select the "Build and Release" workflow
+3. Click "Run workflow"
+4. Choose version bump type: patch, minor, or major
+
+== Commit Message Convention
+
+This project uses a customizable commit convention defined in `.kommit.yaml`:
+
+- feat: A new feature
+- fix: A bug fix
+- docs: Documentation only changes
+- chore: Other changes
+
+== License
+
+This project is licensed under the MIT License.

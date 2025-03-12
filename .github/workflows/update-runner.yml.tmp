@@ -1,0 +1,58 @@
+name: Update App Manifest
+
+on:
+  repository_dispatch:
+    types: [update-app]
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    env:
+      APP_NAME: runner
+      REPO_LOCATION: https://github.com/OmyDaGreat/KotlinScriptTemplate
+      DESCRIPTION: A Kotlin-based conventional commit message generator
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Git
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+      - name: Get latest commit message from repo
+        id: get_commit_message
+        run: |
+          latest_commit_message=$(curl -s https://api.github.com/repos/${{ github.repository }}/commits/main | jq -r '.commit.message')
+          echo "COMMIT_MESSAGE=$latest_commit_message" >> $GITHUB_ENV
+      - name: Update manifest
+        run: |
+          mkdir -p bucket
+          cat > bucket/${{ env.APP_NAME }}.json << EOF
+          {
+              "version": "${{ github.event.client_payload.version }}",
+              "description": "${{ env.DESCRIPTION }}",
+              "homepage": "${{ env.REPO_LOCATION }}",
+              "license": "MIT",
+              "architecture": {
+                  "64bit": {
+                      "url": "${{ env.REPO_LOCATION }}/releases/download/${{ github.event.client_payload.tag }}/${{ env.APP_NAME }}-${{ github.event.client_payload.version }}.zip",
+                      "hash": "${{ github.event.client_payload.sha256 }}"
+                  }
+              },
+              "bin": "${{ env.APP_NAME }}.bat",
+              "checkver": "github",
+              "autoupdate": {
+                  "architecture": {
+                      "64bit": {
+                          "url": "${{ env.REPO_LOCATION }}/releases/download/v\$version/${{ env.APP_NAME }}-\$version.zip"
+                      }
+                  }
+              }
+          }
+          EOF
+      - name: Commit and push
+        run: |
+          git add bucket/${{ env.APP_NAME }}.json
+          git commit -m "$COMMIT_MESSAGE"
+          git push
