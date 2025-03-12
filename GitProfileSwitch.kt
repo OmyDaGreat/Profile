@@ -294,49 +294,83 @@ class GitProfileSwitch {
 }
 
 /**
+ * Handles the add command to add a new Git profile.
+ *
+ * @param args The command-line arguments.
+ * @param gitProfileSwitch The GitProfileSwitch instance.
+ */
+private fun handleAddCommand(
+    args: Array<String>,
+    gitProfileSwitch: GitProfileSwitch,
+) {
+    if (args.size == 4) {
+        val profileName = args[1]
+        val name = args[2]
+        val email = args[3]
+        gitProfileSwitch.addNewProfile(profileName, name, email)
+    } else {
+        println("Usage: profile add <profileName> <name> <email>")
+    }
+}
+
+/**
+ * Handles the update command to update an existing Git profile.
+ *
+ * @param args The command-line arguments.
+ * @param gitProfileSwitch The GitProfileSwitch instance.
+ */
+private fun handleUpdateCommand(
+    args: Array<String>,
+    gitProfileSwitch: GitProfileSwitch,
+) {
+    if (args.size == 4) {
+        val profileName = args[1]
+        val newName = args[2]
+        val newEmail = args[3]
+        gitProfileSwitch.updateProfile(profileName, newName, newEmail)
+    } else {
+        println("Usage: profile update <profileName> <newName> <newEmail>")
+    }
+}
+
+/**
+ * Handles the delete command to delete an existing Git profile.
+ *
+ * @param args The command-line arguments.
+ * @param gitProfileSwitch The GitProfileSwitch instance.
+ */
+private fun handleDeleteCommand(
+    args: Array<String>,
+    gitProfileSwitch: GitProfileSwitch,
+) {
+    if (args.size == 2) {
+        val profileName = args[1]
+        gitProfileSwitch.deleteProfile(profileName)
+    } else {
+        println("Usage: profile delete <profileName>")
+    }
+}
+
+/**
  * Main function to run the GitProfileSwitch application.
  *
  * @param args Command-line arguments.
  */
 fun main(args: Array<String>) {
     val gitProfileSwitch = GitProfileSwitch()
-    if (args.isNotEmpty()) {
-        when (args[0]) {
-            "add" -> {
-                if (args.size == 4) {
-                    val profileName = args[1]
-                    val name = args[2]
-                    val email = args[3]
-                    gitProfileSwitch.addNewProfile(profileName, name, email)
-                } else {
-                    println("Usage: profile add <profileName> <name> <email>")
-                }
-            }
-            "generate" -> gitProfileSwitch.generateProfilesFile()
-            "switch" -> gitProfileSwitch.switchProfile()
-            "update" -> {
-                if (args.size == 4) {
-                    val profileName = args[1]
-                    val newName = args[2]
-                    val newEmail = args[3]
-                    gitProfileSwitch.updateProfile(profileName, newName, newEmail)
-                } else {
-                    println("Usage: profile update <profileName> <newName> <newEmail>")
-                }
-            }
-            "delete" -> {
-                if (args.size == 2) {
-                    val profileName = args[1]
-                    gitProfileSwitch.deleteProfile(profileName)
-                } else {
-                    println("Usage: profile delete <profileName>")
-                }
-            }
-            "view" -> gitProfileSwitch.viewConfigFile()
-            "help" -> gitProfileSwitch.printHelp()
-            else -> println("Unknown command: ${args[0]}")
-        }
-    } else {
+    if (args.isEmpty()) {
         gitProfileSwitch.printHelp()
+        return
+    }
+
+    when (args[0]) {
+        "add" -> handleAddCommand(args, gitProfileSwitch)
+        "generate" -> gitProfileSwitch.generateProfilesFile()
+        "switch" -> gitProfileSwitch.switchProfile()
+        "update" -> handleUpdateCommand(args, gitProfileSwitch)
+        "delete" -> handleDeleteCommand(args, gitProfileSwitch)
+        "view" -> gitProfileSwitch.viewConfigFile()
+        "help" -> gitProfileSwitch.printHelp()
+        else -> println("Unknown command: ${args[0]}")
     }
 }
