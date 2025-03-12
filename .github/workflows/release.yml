@@ -26,12 +26,12 @@ jobs:
       contents: write
 
     env:
-      KT_NAME: Runner
-      APP_NAME: runner
-      REPO_LOCATION: https://github.com/OmyDaGreat/KotlinScriptTemplate
+      KT_NAME: GitProfileSwitch
+      APP_NAME: profile
+      REPO_LOCATION: https://github.com/OmyDaGreat/Profile
       BUCKET_LOCATION: OmyDaGreat/MaleficBucket
       BUCKET_NAME: malefic
-      DESCRIPTION: A Kotlin-based conventional commit message generator
+      DESCRIPTION: A terminal-based git profile switcher made with Kotlin
       JAVA_VERSION: '21'
       KOTLIN_VERSION: '2.1.10'
 
