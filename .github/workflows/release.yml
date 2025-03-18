@@ -91,6 +91,12 @@ jobs:
           echo "version=$new_version" >> $GITHUB_OUTPUT
           echo "tag=v$new_version" >> $GITHUB_OUTPUT
 
+      - name: Get latest commit message
+        id: commit_message
+        run: |
+          latest_commit_message=$(git log -1 --pretty=format:%s)
+          echo "latest_commit_message=$latest_commit_message" >> $GITHUB_OUTPUT
+
       - name: Compile Kotlin Application
         run: |
           mkdir -p build
@@ -185,4 +191,4 @@ jobs:
           token: ${{ secrets.REPO_ACCESS_TOKEN }}
           repository: ${{ env.BUCKET_LOCATION }}
           event-type: update-${{ env.APP_NAME }}
-          client-payload: '{"version": "${{ steps.version.outputs.version }}", "sha256": "${{ steps.sha.outputs.sha256 }}", "tag": "${{ steps.version.outputs.tag }}"}'
+          client-payload: '{"version": "${{ steps.version.outputs.version }}", "sha256": "${{ steps.sha.outputs.sha256 }}", "tag": "${{ steps.version.outputs.tag }}", "latest_commit_message": "${{ steps.commit_message.outputs.latest_commit_message }}"}'
