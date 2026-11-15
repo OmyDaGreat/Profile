@@ -24,6 +24,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      sha256: ${{ steps.sha.outputs.sha256 }}
 
     env:
       KT_NAME: GitProfileSwitch
@@ -91,12 +95,6 @@ jobs:
           echo "version=$new_version" >> $GITHUB_OUTPUT
           echo "tag=v$new_version" >> $GITHUB_OUTPUT
 
-      - name: Get latest commit message
-        id: commit_message
-        run: |
-          latest_commit_message=$(git log -1 --pretty=format:%s)
-          echo "latest_commit_message=$latest_commit_message" >> $GITHUB_OUTPUT
-
       - name: Compile Kotlin Application
         run: |
           mkdir -p build
@@ -131,32 +129,6 @@ jobs:
           checksum=$(sha256sum ${{ env.APP_NAME }}-${{ steps.version.outputs.version }}.zip | awk '{print $1}')
           echo "sha256=$checksum" >> $GITHUB_OUTPUT
 
-      - name: Create Scoop Manifest
-        run: |
-          cat > ${{ env.APP_NAME }}.json << EOF
-          {
-              "version": "${{ steps.version.outputs.version }}",
-              "description": "${{ env.DESCRIPTION }}",
-              "homepage": "${{ env.REPO_LOCATION }}",
-              "license": "MIT",
-              "architecture": {
-                  "64bit": {
-                      "url": "${{ env.REPO_LOCATION }}/releases/download/${{ steps.version.outputs.tag }}/${{ env.APP_NAME }}-${{ steps.version.outputs.version }}.zip",
-                      "hash": "${{ steps.sha.outputs.sha256 }}"
-                  }
-              },
-              "bin": "${{ env.APP_NAME }}.bat",
-              "checkver": "github",
-              "autoupdate": {
-                  "architecture": {
-                      "64bit": {
-                          "url": "${{ env.REPO_LOCATION }}/releases/download/v\$version/${{ env.APP_NAME }}-\$version.zip"
-                      }
-                  }
-              }
-          }
-          EOF
-
       - name: Create GitHub Release
         id: create_release
         uses: softprops/action-gh-release@v3
@@ -182,13 +154,58 @@ jobs:
           prerelease: false
           files: |
             ${{ env.APP_NAME }}-${{ steps.version.outputs.version }}.zip
-            ${{ env.APP_NAME }}.json
 
-      - name: Update Scoop Bucket
-        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.update_bucket != 'false' }}
-        uses: peter-evans/repository-dispatch@v4
-        with:
-          token: ${{ secrets.REPO_ACCESS_TOKEN }}
-          repository: ${{ env.BUCKET_LOCATION }}
-          event-type: update-${{ env.APP_NAME }}
-          client-payload: '{"version": "${{ steps.version.outputs.version }}", "sha256": "${{ steps.sha.outputs.sha256 }}", "tag": "${{ steps.version.outputs.tag }}", "latest_commit_message": "${{ steps.commit_message.outputs.latest_commit_message }}"}'
+  package-managers:
+    name: Update Scoop Bucket
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.build.outputs.version }}
+      RELEASES: https://github.com/OmyDaGreat/Profile/releases/download/${{ needs.build.outputs.tag }}
+      SHA256: ${{ needs.build.outputs.sha256 }}
+      REPO_ACCESS_TOKEN: ${{ secrets.REPO_ACCESS_TOKEN }}
+    steps:
+      - name: Check for repository token
+        id: token
+        run: |
+          if [ -z "$REPO_ACCESS_TOKEN" ]; then
+            echo "::warning::REPO_ACCESS_TOKEN is not set; skipping Scoop update."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update Scoop manifest
+        if: steps.token.outputs.present == 'true'
+        run: |
+          git clone "https://x-access-token:${REPO_ACCESS_TOKEN}@github.com/OmyDaGreat/MaleficBucket.git"
+          cd MaleficBucket
+          mkdir -p bucket
+          cat > bucket/profile.json << EOF
+          {
+              "version": "${VERSION}",
+              "description": "A terminal-based git profile switcher made with Kotlin",
+              "homepage": "https://github.com/OmyDaGreat/Profile",
+              "license": "MIT",
+              "architecture": {
+                  "64bit": {
+                      "url": "${RELEASES}/profile-${VERSION}.zip",
+                      "hash": "${SHA256}"
+                  }
+              },
+              "bin": "profile.bat",
+              "checkver": "github",
+              "autoupdate": {
+                  "architecture": {
+                      "64bit": {
+                          "url": "https://github.com/OmyDaGreat/Profile/releases/download/v\$version/profile-\$version.zip"
+                      }
+                  }
+              }
+          }
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bucket/profile.json
+          git commit -m "profile: update to ${VERSION}"
+          git push
