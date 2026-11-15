@@ -48,7 +48,7 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
 
       - name: Setup Kotlin
-        uses: fwilhe2/setup-kotlin@v1
+        uses: fwilhe2/setup-kotlin@v2.1
         with:
           version: ${{ env.KOTLIN_VERSION }}
 
